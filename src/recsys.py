@@ -16,6 +16,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import normalize
 
 K = 5
+UNIT = 1.0  # interaction weight = number of full watches (>=50% of an airing); see build_interactions.py
 
 
 def user_item(train, half_life_days=None):
@@ -47,7 +48,7 @@ def history_scores(ui, users, cands):
     pos = pd.Series(np.arange(len(cands)), index=cands); upos = pd.Series(np.arange(len(users)), index=users)
     u = ui[ui.user_id.isin(users) & ui.tv_show_id.isin(cands)]
     H = np.zeros((len(users), len(cands)))
-    H[upos[u.user_id].values, pos[u.tv_show_id].values] = np.log1p(u.w.values / 60)
+    H[upos[u.user_id].values, pos[u.tv_show_id].values] = np.log1p(u.w.values / UNIT)
     return H
 
 
@@ -84,7 +85,7 @@ def cbf_scores(ui, users, cands, meta):
     pos = pd.Series(np.arange(len(items)), index=items)
     u = ui[ui.user_id.isin(users) & ui.tv_show_id.isin(items)]
     upos = pd.Series(np.arange(len(users)), index=users)
-    R = sp.csr_matrix((np.log1p(u.w.values / 60), (upos[u.user_id].values, pos[u.tv_show_id].values)),
+    R = sp.csr_matrix((np.log1p(u.w.values / UNIT), (upos[u.user_id].values, pos[u.tv_show_id].values)),
                       shape=(len(users), len(items)))
     P = normalize(R @ X)                                        # user profiles
     C = X[pos.reindex(cands).fillna(-1).astype(int).clip(lower=0).values]
@@ -98,7 +99,7 @@ def als_scores(ui, users, cands, factors=16, reg=0.05, iters=15, alpha=0.5, seed
     from implicit.als import AlternatingLeastSquares
     uids = ui.user_id.unique(); iids = ui.tv_show_id.unique()
     upos = pd.Series(np.arange(len(uids)), index=uids); ipos = pd.Series(np.arange(len(iids)), index=iids)
-    conf = alpha * np.log1p(ui.w.values / 60)
+    conf = alpha * np.log1p(ui.w.values / UNIT)
     R = sp.csr_matrix((conf.astype(np.float32), (upos[ui.user_id].values, ipos[ui.tv_show_id].values)),
                       shape=(len(uids), len(iids)))
     model = AlternatingLeastSquares(factors=factors, regularization=reg, iterations=iters,

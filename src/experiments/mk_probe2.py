@@ -1,0 +1,20 @@
+import sys; sys.path.insert(0,'repo/src')
+import numpy as np, pandas as pd, recsys as R, warnings; warnings.filterwarnings('ignore')
+m=pd.read_parquet('data/matches.parquet'); sched=pd.read_parquet('data/schedule.parquet')
+m=m[m.tv_show_id!=0].copy(); m['week']=m.ts.dt.isocalendar().week.astype(int); sched['week']=sched.start.dt.isocalendar().week.astype(int)
+t=pd.read_csv('/mnt/user-data/uploads/sweettv-tv-program-recommender/submission.csv')
+users=np.array(t.user_id.astype('uint64').values,dtype=np.uint64)
+cands=np.array(sorted(sched[(sched.week>=31)&(sched.tv_show_id!=0)].tv_show_id.unique()))
+ui=R.user_item(m); P=R.popularity_scores(ui,users,cands)
+Pr=R.popularity_scores(R.user_item(m[m.week>=25]),users,cands)
+H=R.history_scores(ui,users,cands); A=R.als_scores(R.user_item(m,14),users,cands)
+valid=set(cands.astype(str))
+out={'pop_recent':Pr,'pop_light':R.hybrid_scores([P,H,A],(1,0.25,0.25)),'poprecent_light':R.hybrid_scores([Pr,H,A],(1,0.25,0.25))}
+base=R.topk(P,cands)
+for name,S in out.items():
+    top=R.topk(S,cands)
+    sub=pd.DataFrame({'user_id':t.user_id.astype(str),'tv_show_id':[' '.join(map(str,r)) for r in top]})
+    ids=sub.tv_show_id.str.split(' '); assert ids.map(lambda r:len(set(r))==5 and set(r)<=valid).all() and len(sub)==1260
+    sub.to_csv(f'/mnt/user-data/outputs/submission_{name}.csv',index=False)
+    print(name,'ok; share of slots differing from popularity:',round((top!=base).mean(),3))
+print('pop top5 full:',base[0],' recent:',R.topk(Pr,cands)[0])

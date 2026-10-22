@@ -2,6 +2,8 @@ import sys; sys.path.insert(0,__file__.rsplit('/',1)[0])
 import numpy as np, pandas as pd, recsys as R
 pd.set_option('display.width',250); pd.set_option('display.max_colwidth',45)
 m=pd.read_parquet('data/matches.parquet'); sched=pd.read_parquet('data/schedule.parquet')
+m=m.merge(sched[['channel_id','start','duration']].rename(columns={'start':'ts'}),on=['channel_id','ts'],how='left')
+m=m[m.sec>=0.5*m.duration]   # full watch (>=50% of airing)
 mm=m[m.tv_show_id!=0].copy(); mm['week']=mm.ts.dt.isocalendar().week.astype(int)
 tr,va=mm[mm.week<25],mm[mm.week>=25]
 meta=R.show_meta(sched)

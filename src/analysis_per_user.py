@@ -1,6 +1,8 @@
 import sys; sys.path.insert(0,__file__.rsplit('/',1)[0])
 import numpy as np, pandas as pd, recsys as R
 m=pd.read_parquet('data/matches.parquet'); sched=pd.read_parquet('data/schedule.parquet')
+m=m.merge(sched[['channel_id','start','duration']].rename(columns={'start':'ts'}),on=['channel_id','ts'],how='left')
+m=m[m.sec>=0.5*m.duration]   # full watch (>=50% of airing)
 L=pd.read_parquet('data/logs.parquet')
 print('matched watch-seconds share on id0:', round(m[m.tv_show_id==0].sec.sum()/m.sec.sum(),3))
 print('id0 categories in matches:\n', m[m.tv_show_id==0].groupby('tv_show_category').sec.sum().div(m[m.tv_show_id==0].sec.sum()).round(3).sort_values(ascending=False).head(6))

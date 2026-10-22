@@ -1,1 +1,1 @@
-{"weights": {"w_hist": 1.5, "w_als": 1.0, "w_cbf": 0.0}, "oracle_MAP5_on_holdout": 0.7210389871382636}
+{"weights": {"w_hist": 1.5, "w_als": 0.0, "w_cbf": 0.5}, "oracle_MAP5_on_holdout": 0.5867770597738288}

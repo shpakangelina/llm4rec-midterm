@@ -4,7 +4,7 @@ Validation: train on weeks 11-24 (2020-03-09..06-14), validate on weeks 25-30 (0
 Hybrid weights: tuned on a separate earlier split (train 11-18, tune 19-24).
   - users: Kaggle test users who watched >=1 identified show in weeks 25-30
   - candidate pool: shows with an ID airing in weeks 25-30 (from the schedule = metadata, known in advance)
-  - truth: shows the user watched in weeks 25-30 (matching rule in build_interactions.py)
+  - truth: shows the user fully watched (>=50% of an airing in one session) in weeks 25-30
   - same users / pool / metrics for every method
 Submission: same pipeline retrained on weeks 11-30; candidates = shows airing in weeks 31-42.
 
@@ -19,12 +19,18 @@ import recsys as R
 data_dir, sub_path, out_dir = sys.argv[1:4]
 m = pd.read_parquet(f"{data_dir}/matches.parquet")
 sched = pd.read_parquet(f"{data_dir}/schedule.parquet")
-m = m[m.tv_show_id != 0].copy()
+# relevance / interaction = "full watch": the session covered >= 50% of the airing (FULL_WATCH);
+# each full watch counts 1 (sec := 1), so user_item() returns full-watch counts.
+FULL_WATCH = 0.5
+m = m.merge(sched[["channel_id", "start", "duration"]].rename(columns={"start": "ts"}), on=["channel_id", "ts"], how="left")
+m = m[(m.tv_show_id != 0) & (m.sec >= FULL_WATCH * m.duration)].copy()
+m["sec"] = 1.0
 m["week"] = m.ts.dt.isocalendar().week.astype(int)
 sched["week"] = sched.start.dt.isocalendar().week.astype(int)
 template = pd.read_csv(sub_path)
 test_users = np.array(template.user_id.astype("uint64").values, dtype=np.uint64)
-HL = 14  # half-life (days) of time decay for personal signals
+import os
+HL = 14 if os.environ.get("DECAY14") else None  # time decay for personal signals: none (final); DECAY14=1 -> half-life 14 days (fw_hybrid.csv variant)
 
 
 def pool(w0, w1):
